@@ -447,7 +447,7 @@ anmelden_pluto ()
 
 {
 
-MYSQL=" mysql -h dyo-online.de -u markus --password=anne1901"
+MYSQL=" mysql -h dyo-online.de -u USERNAME --password=Geheim"
 mysql_date=`date '+%Y-%m-%d %H:%M:%S'`
 
 echo "insert into produktion.monitor values ('$HOSTNAME','$0','working','$mysql_date');"  | $MYSQL
@@ -492,7 +492,7 @@ eintrag_console ()
 
 {
 
-MYSQL=" mysql -h simon -u markus --password=anne1901"
+MYSQL=" mysql -h simon -u USER --password=Geheim"
 message_date=`date '+%Y-%m-%d %H:%M:%S'`
 
 echo "insert into produktion.scriptconsole values ('$message_date','$HOSTNAME','$0','$1');" | $MYSQL
