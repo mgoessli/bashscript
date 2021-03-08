@@ -1,0 +1,46 @@
+#!/bin/bash
+# Script zum Backup 
+#_____________________________________________________________________________________________________
+# 18.08.2006	design		Markus Goessling 
+#
+#######################################################################################################
+BACKUPDIR=/backup
+CONFIGFILE=/appl/system/etc/backup_local.cfg
+DATUM=`date '+%m%d%y%M%S'`
+LOGFILE=/appl/system/log/localbackup_$DATUM.log
+
+exec >> $LOGFILE 2>&1 
+
+
+. /appl/system/lib/shlib
+
+
+echo "PID=$$"
+
+# Ueberpruefen des Users
+
+#if [ $LOGNAME != "root" ]
+#then
+#	echo "Dieser Script kann nur root starten "
+#	crashed_pluto
+	#eintrag_console "ERROR: falscher User"
+	
+	#exit 10
+#fi
+
+
+
+
+# Einlesen des Configfiles  und Backup 
+
+cat $CONFIGFILE | while read FILESYSTEM BACKUPNAME
+do
+			# Sichern des Filessystems
+			tar -cvjpf $BACKUPDIR/${BACKUPNAME}_${DATUM}.tar.bzip2 $FILESYSTEM
+			if [ $? -ne 0 ]
+			then
+				echo "Backup meldet Fehler beim sichern des Filesystems $FILESYSTEM "
+				 
+			fi
+done	
+echo "ENDE"

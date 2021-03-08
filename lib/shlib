@@ -1,0 +1,501 @@
+
+
+mail_attchment()
+
+{
+
+if [ $# -ne 4 ]
+then 
+	echo "mail_attchment MAILTO SUBJECT FILEPATH FILENAME"
+	return	
+fi	
+
+MAILTO=$1
+SUBJECT=$2
+FILEPATH=$3
+FILENAME=$4
+
+cd $FILEPATH
+
+echo "From:$LOGNAME">$FILENAME.tmp 
+echo "To: $MAILTO">>$FILENAME.tmp
+echo "Subject: "`echo $SUBJECT | sed s/%/" "/g`>>$FILENAME.tmp
+echo "Mime-Version:1.0">>$FILENAME.tmp
+echo "Content-Type: multipart/mixed; boundary=\"0-858349795-976094463=:56288\"">>$FILENAME.tmp
+echo >>$FILENAME.tmp
+echo "--0-858349795-976094463=:56288">>$FILENAME.tmp
+echo "Content-Type: text/plain">>$FILENAME.tmp
+echo >>$FILENAME.tmp
+echo "Please find attached file $FILENAME">>$FILENAME.tmp
+echo "--0-858349795-976094463=:56288">>$FILENAME.tmp
+echo "Content-Type: application/Text; name=$FILENAME.txt">>$FILENAME.tmp
+echo >>$FILENAME.tmp
+cat $FILENAME >>$FILENAME.tmp
+echo >>$FILENAME.tmp
+echo "--0-858349795-976094463=:56288--">>$FILENAME.tmp
+/usr/lib/sendmail -t -oi <$FILENAME.tmp
+rm -f $FILENAME.tmp
+}
+
+
+
+mail_attchment_text()
+
+{
+
+if [ $# -ne 5 ]
+then
+        echo "mail_attchment_text MAILTO SUBJECT TEXT FILEPATH FILENAME"
+        return 
+fi
+
+MAILTO=$1
+SUBJECT=$2
+TEXT=$3
+FILEPATH=$4
+FILENAME=$5
+
+echo "From:$LOGNAME">$FILENAME.tmp
+echo "To: $MAILTO">>$FILENAME.tmp
+echo "Subject: "`echo $SUBJECT | sed s/%/" "/g`>>$FILENAME.tmp
+echo "Mime-Version:1.0">>$FILENAME.tmp
+echo "Content-Type: multipart/mixed; boundary=\"0-858349795-976094463=:56288\"">>$FILENAME.tmp
+echo >> $FILENAME.tmp
+echo "--0-858349795-976094463=:56288">>$FILENAME.tmp
+echo "Content-Type: text/plain">>$FILENAME.tmp
+echo >>$FILENAME.tmp
+echo $TEXT >>$FILENAME.tmp
+echo "--0-858349795-976094463=:56288">>$FILENAME.tmp
+echo "Content-Type: application/Text; name=$FILENAME.txt">>$FILENAME.tmp
+echo >>$FILENAME.tmp
+cat $FILENAME >>$FILENAME.tmp
+echo >>$FILENAME.tmp
+echo "--0-858349795-976094463=:56288--">>$FILENAME.tmp
+/usr/lib/sendmail -t -oi <$FILENAME.tmp
+rm -f $FILENAME.tmp
+}
+
+
+
+ftp_delete()
+
+{
+
+
+if [ $# -ne 5 ]
+then
+        echo "usage: ftp_delete Hostname user password remote_dir Filename"
+        return 
+fi
+
+
+# $1 = Hostname or IP adresse
+# $2 = user
+# $3 = password
+# $4 = dir
+# $5 = Filename
+
+ftp_tmp=/tmp/ftp.tmp.$$
+
+echo "open $1" > $ftp_tmp
+echo "user $2 $3" >> $ftp_tmp
+echo "cd $4" >> $ftp_tmp
+echo "dir $5" >> $ftp_tmp
+echo "delete $5" >> $ftp_tmp
+echo "dir" >> $ftp_tmp
+echo "bye" >> $ftp_tmp
+
+ftp_delete=/tmp/ftp_delete.$$
+ftp -inv < $ftp_tmp >$ftp_delete 2>&1
+rm -f $ftp_tmp
+
+	
+success=`grep "$5" $ftp_delete | grep -v deleted | wc -l`
+success=`printf $success`
+
+if [ $success = 1 ]
+then
+	echo "File $1 was deleted on host $1 in dir $4"	
+	rc=0
+else
+	echo "File $1 was not deletet on host $1 in dir $4"
+	rc=1
+fi
+
+rm -f $ftp_delete
+rm -f $ftp_tmp
+return $rc
+ 
+}
+
+
+ftp_put()
+
+{
+if [ $# -ne 5 ]
+then
+        echo "usage: ftp_put Hostname user password remote_dir Filename"
+        return 1
+fi
+
+# $1 = Hostname or IP adresse
+# $2 = user
+# $3 = password
+# $4 = remote dir
+# $5 = Filename
+
+
+ftp_tmp=/tmp/ftp.tmp.$$
+
+echo "open $1" > $ftp_tmp 
+echo "user $2 $3" >> $ftp_tmp 
+echo "cd $4" >> $ftp_tmp 
+echo "pwd" >> $ftp_tmp
+echo "bin" >> $ftp_tmp
+echo "put $5" >> $ftp_tmp 
+echo "dir $5" >> $ftp_tmp
+echo "bye" >> $ftp_tmp 
+
+ftp -inv < $ftp_tmp > /tmp/ftp_put.$$ 3>&1
+
+
+
+remote_size=`cat /tmp/ftp_put.$$ | grep "\-r" | awk '{ print $5 }'` 
+local_size=`ls -lt $5 | awk '{ print $5 }'`
+
+
+if [ $local_size -eq  $remote_size ]
+then
+	echo "File $5 ( $local_size) was transfered to host $1 (dir: $4)"
+	rc=0
+else
+	echo "File $5 was NOT transfered to host $1 (dir: $4)"
+	rc=1
+	ftp_delete $1 $2 $3 $4 $5
+	
+	
+fi
+rm -f $ftp_tmp
+rm -f ftp_put.$$
+return $rc
+
+}
+
+ftp_get()
+
+{
+
+if [ $# -ne 6 ]
+then
+        echo "usage: ftp_get Hostname user password dir Filename delete/bodelete"
+        return
+fi
+
+# $1 = Hostname or IP adresse
+# $2 = user
+# $3 = password
+# $4 = remote dir
+# $5 = Filename
+# $6 = delete / no delete
+
+ftp_dir=/tmp/ftp.dir.$$
+
+echo "open $1" > $ftp_dir
+echo "user $2 $3 " >> $ftp_dir
+echo "cd $4"  >> $ftp_dir
+echo "dir" >> $ftp_dir
+
+ftp -inv < $ftp_dir > /tmp/ftp_dir_out.$$ 2>&1
+
+filedollar=`echo $5$`
+fileda=`grep $filedollar /tmp/ftp_dir_out.$$ | wc -w`
+fileda=`printf $fileda`
+
+if [ $fileda -gt 0 ]
+then
+        echo "File $5 exist on maschine $1 in dir $4"
+else
+        echo "File $5 does not exist on maschine $1 in dir $4"
+        rm -f $ftp_dir
+        rm -f /tmp/ftp_dir_out.$$
+        return 1
+fi
+
+
+ftp_tmp=/tmp/ftp.tmp.$$
+
+echo "open $1" > $ftp_tmp
+echo "user $2 $3" >> $ftp_tmp
+echo "cd $4" >> $ftp_tmp
+echo "bin" >> $ftp_tmp
+echo "get $5" >> $ftp_tmp
+echo "dir $5" >> $ftp_tmp
+echo "bye" >> $ftp_tmp
+
+
+
+ftp -inv < $ftp_tmp > /tmp/ftp_get.$$ 2>&1
+mac=`grep MACOS /tmp/ftp_get.$$ | cut -d" " -f5`
+
+if [ $mac = "MACOS." ] 2>/dev/null
+then
+	remote_size=`cat /tmp/ftp_get.$$ | grep "\-rw" | awk '{ print $4 }' `
+else
+	remote_size=`cat /tmp/ftp_get.$$ | grep "\-rw" | awk '{ print $5 }' `
+fi
+
+if [ -s $5 ]
+then
+        local_size=`ls -l $5 2>/dev/null | awk '{ print $5 }'`
+else
+        local_size=0
+fi
+
+
+if [ $local_size -eq  $remote_size ]
+then
+        echo "File $5 was transfered from host $1 (dir: $4)"
+	if [ $6 = "delete" ]
+	then
+		ftp_delete $1 $2 $3 $4 $5
+	fi
+	
+	rc=0
+else
+        echo "ftp transfer was unsuccessfull"
+        rm -f $5
+	rc=1
+
+fi
+rm -f $ftp_tmp
+rm -f ftp_get.$$
+rm -f $ftp_dir
+rm -f /tmp/ftp_dir_out.$$
+return $rc
+
+}
+
+block_wait()
+
+{
+
+if [ $# -ne 5 ]
+then
+        echo "usage: block_wait blockfile error_id error_msg costumershrt costumer_id"
+        return
+fi
+
+block=$1
+error_id=$2
+error_msg=$3
+mailingerr=pc5adm
+
+
+touch  $block
+
+if [ -f $block ]
+then
+	echo $error_msg | mailx -s$block $mailingerr
+fi
+
+while [ -f $block ]
+do
+	sleep 10
+done
+}
+
+ftp_mget()
+
+{
+
+
+if [ $# -ne 5 ]
+then
+        echo "usage: ftp_mget Hostname user password dir delete/nodelete"
+        return
+fi
+
+# $1 = Hostname or IP adresse
+# $2 = user
+# $3 = password
+# $4 = remote dir
+# $5 = delete / not delete
+
+ftp_dir=/tmp/ftp.dir.$$
+
+echo "open $1" > $ftp_dir
+echo "user $2 $3 " >> $ftp_dir
+echo "cd $4"  >> $ftp_dir
+echo "dir" >> $ftp_dir
+
+ftp -inv  < $ftp_dir > /tmp/ftp_dir_out.$$
+
+mac=`grep MACOS /tmp/ftp_dir_out.$$ | cut -d" " -f5`
+if [ $mac = "MACOS." ] 2> /dev/null
+then
+	cat /tmp/ftp_dir_out.$$ | grep "\-r" | awk '{ print $8 }' > /tmp/dir_list.$$
+	cat /tmp/dir_list.$$ | while read file
+
+	do
+		ftp_get $1 $2 $3 $4 $file $5
+	done
+else
+	cat /tmp/ftp_dir_out.$$ | grep "\-r" | awk '{ print $9 }' > /tmp/dir_list.$$
+	cat /tmp/dir_list.$$ | while read file
+	do
+		ftp_get $1 $2 $3 $4 $file $5
+	done
+fi
+
+
+rm -f $ftp_dir
+rm -f /tmp/ftp_dir_out.$$
+rm -f /tmp/dir_list.$$
+rm -f $ftp_dir
+rm -f /tmp/ftp_dir_out.$$
+
+}
+
+bin_file_mail ()
+
+{
+
+if [ $# -ne 4 ]
+then
+        echo 'bin_file_mail MAILTO SUBJECT FILEPATH FILENAME'
+        return
+fi
+
+MAILTO=$1
+SUBJECT=$2
+FILEPATH=$3
+FILENAME=$4
+uu_file=/tmp/$filename_$$.uu
+
+cd $FILEPATH
+
+echo "From:$LOGNAME"  > $uu_file
+echo "Organization: Familie Goessling" >> $uu_file
+echo "To:$MAILTO"  >> $uu_file
+echo "Subject:$SUBJECT" >> $uu_file
+echo "MIME-Version:1.0" >> $uu_file
+echo "Content-Type: multipart" >> $uu_file
+echo "Content-Type:application;name=$FILENAME" >> $uu_file
+echo "X-Mailer:shlib" >> $uu_file
+echo "--0-858349795-976094463=:56288" >> $uu_file
+/usr/bin/uuencode -m $FILENAME $FILENAME >> $uu_file
+/usr/lib/sendmail -t -oi < $uu_file
+if [ $? = 0 ]
+then
+        echo "file $FILENAME was send via E-Mail to $MAILTO succesfull"
+else
+        echo "Error: file $FILENAME was send via E-Mail to $MAILTO UNSUCCESFULL"
+fi
+/bin/rm -f $uu_file
+}
+
+ssh_cp ()
+
+{
+
+
+
+if [ $# -ne 4 ]
+then
+        echo "usage: ssh_cp key (full path) filename or path user@host
+remote file name"
+        return 1
+fi
+
+
+
+# $1 -> Key
+# $2 -> file
+# $3 -> user@server
+# $4 -> remote file name
+
+
+if [ -s $1 ]
+then
+        scp -i $1 $2 $3:$4 > /dev/null
+        remote_size=`ssh -i $1 $3 ls -l $4 | awk '{ print $5 }'`
+        local_size=`ls -lt $2 | awk '{ print $5 }'`
+        if [ $local_size -eq $remote_size ]
+        then
+                echo "File $2 was transfered  succesfully via ssh"
+        else
+                echo "scp transfer from file $2 failed"
+                ssh -i $1 $3 rm -f $4
+                return 1
+        fi
+else
+        echo "Can not find key - ssh_cp can not run - abort !!!"
+        return 1
+fi
+
+}
+
+logtime ()
+
+{
+
+echo `date +%d.%m.%Y:%H:%M:%S`
+
+}
+
+anmelden_pluto ()
+
+{
+
+MYSQL=" mysql -h dyo-online.de -u markus --password=anne1901"
+mysql_date=`date '+%Y-%m-%d %H:%M:%S'`
+
+echo "insert into produktion.monitor values ('$HOSTNAME','$0','working','$mysql_date');"  | $MYSQL
+
+}
+
+
+abmelden_pluto ()
+
+{
+
+mysql_date_old=$mysql_date
+mysql_date=`date '+%Y-%m-%d %H:%M:%S'`
+echo "update produktion.monitor set STATUS='finished', ZEITSTEMPEL='$mysql_date' where HOST='$HOSTNAME' and JOB='$0' and ZEITSTEMPEL='$mysql_date_old'" | $MYSQL
+
+
+}
+
+error_pluto ()
+
+
+{
+
+mysql_date_old=$mysql_date
+mysql_date=`date '+%Y-%m-%d %H:%M:%S'`
+echo "update produktion.monitor set STATUS='ERROR', ZEITSTEMPEL='$mysql_date' where HOST='$HOSTNAME' and JOB='$0' and ZEITSTEMPEL='$mysql_date_old'" | $MYSQL
+
+}
+
+crashed_pluto ()
+
+{
+
+mysql_date_old=$mysql_date
+mysql_date=`date '+%Y-%m-%d %H:%M:%S'`
+echo "update produktion.monitor set STATUS='crashed', ZEITSTEMPEL='$mysql_date' where HOST='$HOSTNAME' and JOB='$0' and ZEITSTEMPEL='$mysql_date_old'" | $MYSQL
+
+}
+
+
+eintrag_console ()
+
+{
+
+MYSQL=" mysql -h simon -u markus --password=anne1901"
+message_date=`date '+%Y-%m-%d %H:%M:%S'`
+
+echo "insert into produktion.scriptconsole values ('$message_date','$HOSTNAME','$0','$1');" | $MYSQL
+echo $1 | mailx -s "ERROR $0 "markus_goessling@gmx.net
+
+}
