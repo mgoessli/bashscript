@@ -2,6 +2,6 @@
 
 Der Aufbau der Datei ist sehr einfach:
 
-<Path> <Name des Backups>
+Path Backup Name
 
 Achtung! Path so wählen, dass das Archiv nicht größer als 2 GB wird
