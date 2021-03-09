@@ -1,0 +1,24 @@
+#/bin/bash
+DATUM=`date '+%m%d%y%M%S'`
+LOGFILE=/appl/ci/log/aktiv_client_$DATUM.log
+
+
+
+exec >> $LOGFILE 2>&1
+
+
+ls -d /home/markus/Dropbox/ci/data/*  | while read file
+do
+	cd $file
+	ls | while read daten
+	do
+		ncftpput -R -DD -u USER -p PASSWORT HOST_CI_HUB /appl/ci/data/ "$daten"
+		 if [ $? -eq 0 ]
+                 then
+                                echo "File wurde erfolgreich uebertragen"
+                                rm -rf "$filename" 2>/dev/null
+                 else
+                                echo "File wurde nicht erfolgreich uebertragen"
+                 fi
+	done
+done
