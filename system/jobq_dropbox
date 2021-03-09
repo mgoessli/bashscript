@@ -1,0 +1,35 @@
+#!/bin/bash
+DATUM=`date '+%m%d%y%M%S'`
+LOGFILE=/appl/system/log/jobq_dropbox_$HOSTNAME_$DATUM.log
+JOBQDIR=~/Dropbox/jobq_$HOSTNAME
+exec >> $LOGFILE 2>&1
+echo "Jobq startet fuer User $USER"
+echo "Ich bin `whoami`"
+
+
+	if [ `ls $JOBQDIR  | wc -l` -eq 0 ]
+	then	
+		echo "keine Jobs gefunden"
+		exit
+	else
+		echo "Anzahl der Jobs" `ls $JOBQDIR | grep -v "." | wc -l `
+		echo "folgende Jobs gefunden: "
+		ls -a $JOBQDIR
+		cd $JOBQDIR
+		pwd
+	fi
+
+
+ls | while read file
+do
+	echo "Bearbeite Job $file"
+	chmod 755 $file
+	./$file
+	returncode=$?
+	echo "Return-Code von Job $file: $returncode"
+	if [ $returncode -eq 0 ]
+	then
+		rm $file
+	fi
+done
+
